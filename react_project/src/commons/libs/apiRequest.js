@@ -1,30 +1,37 @@
-export function apiRequest(url, method = 'GET', data, headers) {
-  // url - http://naver.com https://naver.com -> 외부 자원이다.
-  if (!/^http[s]?:/i.test(url)) {
-    // API 서버로 요청 보내는 주소인 경우
-    // http[s]?:로 시작하면 외부 자원이다.
+import axios from 'axios';
+import cookies from 'react-cookies';
+
+export default function apiRequest(url, method = 'GET', data, headers) {
+  /**
+   * url - http://jsonplaceholder.. https://
+   */
+  if (!/^http[s]?/i.test(url)) {
+    // 외부 URL이 아닌 경우 - http://localhost:4000/api/v1/account
     url = process.env.REACT_APP_API_URL + url;
-    // /account -> http://localhost:3000/api/v1/account
   }
+
+  /**
+   * axios 응답 코드가 2xx ~ 3xx 만 정상 응답 판단
+   *       그외의 응답 코드는 예외 발생 -> 4xx 역시 오류로 판단 -> 정상 응답의 범위를 변경
+   */
 
   const options = {
-    mod: 'no-cors',
     method,
+    url,
+    validateStatus: (status) => status < 500, // 500 미만의 응답 코드는 정상 응답
   };
 
-  // BODY가 있는 요청인 경우
-  if (['POST', 'PUT', 'PATCH'].includes(method.toLocaleUpperCase()) && data) {
-    headers = headers ?? {};
-    headers['Content-Type'] = 'application/json';
-    // BODY 가 있는 경우 Content-Type이 json이라고 헤더에서 알려준다.
-    options.headers = headers;
-    options.body = JSON.stringify(data); // 요청 데이터를 JSON타입의 문자열로 전송
+  if (['POST', 'PUT', 'PATCH'].includes(method.toUpperCase()) && data) {
+    options.data = data;
   }
 
-  return new Promise((reslove, reject) => {
-    fetch(url, options)
-      .then((res) => res.json())
-      .then((json) => reslove(json))
-      .catch((err) => reject(err));
-  }); // 범용 기능을 편하게 쓰기 위해 만들었다.
+  const token = cookies.load('token');
+  if (token && token.trim()) {
+    headers = headers ?? {};
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  if (headers) options.headers = headers;
+
+  return axios(options);
 }
